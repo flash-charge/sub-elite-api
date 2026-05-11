@@ -22,73 +22,73 @@ export default {
     const pathname = url.pathname
 
     try {
-      if (request.method === 'OPTIONS') return handleOptions(pathname, request)
-      if (pathname === '/healthz' && request.method === 'GET') return json({ ok: true }, 200, 'GET,OPTIONS', request)
+      if (request.method === 'OPTIONS') return handleOptions(pathname, request, env)
+      if (pathname === '/healthz' && request.method === 'GET') return json({ ok: true }, 200, 'GET,OPTIONS', request, env)
       if (pathname === '/api/convert' && request.method === 'POST') return handleConvert(request, env)
       if (pathname === '/api/subscriptions' && request.method === 'POST') return handleCreateSubscription(request, env)
       if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname) && request.method === 'GET') {
         return handleSubscription(pathname, env, request)
       }
 
-      return json({ error: 'Not found' }, 404, 'GET,POST,OPTIONS', request)
+      return json({ error: 'Not found' }, 404, 'GET,POST,OPTIONS', request, env)
     } catch (error) {
-      return json({ error: error.message || 'Server error' }, error.statusCode || 500, 'GET,POST,OPTIONS', request)
+      return json({ error: error.message || 'Server error' }, error.statusCode || 500, 'GET,POST,OPTIONS', request, env)
     }
   },
 }
 
-function handleOptions(pathname, request) {
-  if (pathname === '/healthz') return options('GET,OPTIONS', request)
-  if (pathname === '/api/convert' || pathname === '/api/subscriptions') return options('POST,OPTIONS', request)
+function handleOptions(pathname, request, env) {
+  if (pathname === '/healthz') return options('GET,OPTIONS', request, env)
+  if (pathname === '/api/convert' || pathname === '/api/subscriptions') return options('POST,OPTIONS', request, env)
   if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname)) {
-    return new Response(null, { status: isAllowedOrigin(request) ? 204 : 403, headers: subscriptionHeaders(request) })
+    return new Response(null, { status: isAllowedOrigin(request, env) ? 204 : 403, headers: subscriptionHeaders(request, env) })
   }
-  return options('GET,POST,OPTIONS', request)
+  return options('GET,POST,OPTIONS', request, env)
 }
 
 async function handleConvert(request, env) {
-  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'POST,OPTIONS', request)
+  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'POST,OPTIONS', request, env)
 
   const contentLength = Number(request.headers.get('content-length') || 0)
-  if (contentLength > MAX_INPUT_BYTES) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request)
+  if (contentLength > MAX_INPUT_BYTES) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request, env)
 
   const payload = await request.json().catch(() => null)
-  if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request)
+  if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request, env)
 
   const input = String(payload.input || '').trim()
-  if (!input) return json({ error: 'Input cannot be empty.' }, 400, 'POST,OPTIONS', request)
-  if (byteLength(input) > MAX_INPUT_BYTES) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request)
+  if (!input) return json({ error: 'Input cannot be empty.' }, 400, 'POST,OPTIONS', request, env)
+  if (byteLength(input) > MAX_INPUT_BYTES) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request, env)
   if (hasHttpUrl(input)) {
-    return json({ error: 'Paste config links directly, not http/https subscription URLs.' }, 400, 'POST,OPTIONS', request)
+    return json({ error: 'Paste config links directly, not http/https subscription URLs.' }, 400, 'POST,OPTIONS', request, env)
   }
 
-  return json(convertToClashMeta(input, readConvertOptions(payload)), 200, 'POST,OPTIONS', request)
+  return json(convertToClashMeta(input, readConvertOptions(payload)), 200, 'POST,OPTIONS', request, env)
 }
 
 async function handleCreateSubscription(request, env) {
-  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'POST,OPTIONS', request)
-  if (!env.SUBSCRIPTIONS) return json({ error: 'KV binding SUBSCRIPTIONS is not available.' }, 500, 'POST,OPTIONS', request)
+  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'POST,OPTIONS', request, env)
+  if (!env.SUBSCRIPTIONS) return json({ error: 'KV binding SUBSCRIPTIONS is not available.' }, 500, 'POST,OPTIONS', request, env)
 
   const contentType = request.headers.get('content-type') || ''
   if (!contentType.toLowerCase().includes('application/json')) {
-    return json({ error: 'Content-Type must be application/json.' }, 415, 'POST,OPTIONS', request)
+    return json({ error: 'Content-Type must be application/json.' }, 415, 'POST,OPTIONS', request, env)
   }
 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > MAX_SUBSCRIPTION_BYTES + 4096) {
-    return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request)
+    return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
   }
 
   const rateLimitResponse = await checkSubscriptionRateLimit(request, env)
   if (rateLimitResponse) return rateLimitResponse
 
   const payload = await request.json().catch(() => null)
-  if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request)
+  if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request, env)
 
   const yaml = String(payload.yaml || '').trim()
-  if (!yaml) return json({ error: 'YAML cannot be empty.' }, 400, 'POST,OPTIONS', request)
+  if (!yaml) return json({ error: 'YAML cannot be empty.' }, 400, 'POST,OPTIONS', request, env)
   if (byteLength(yaml) > MAX_SUBSCRIPTION_BYTES) {
-    return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request)
+    return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
   }
 
   const expiresIn = Object.hasOwn(SUBSCRIPTION_EXPIRY, payload.expiresIn) ? payload.expiresIn : '30d'
@@ -106,7 +106,7 @@ async function handleCreateSubscription(request, env) {
     ok: true,
     url: new URL(`/sub/${secret}/config.yaml`, request.url).toString(),
     expiresIn,
-  }, 200, 'POST,OPTIONS', request)
+  }, 200, 'POST,OPTIONS', request, env)
 }
 
 async function checkSubscriptionRateLimit(request, env) {
@@ -114,7 +114,7 @@ async function checkSubscriptionRateLimit(request, env) {
   const key = `rate:subscriptions:${bucket}:${clientIp(request)}`
   const current = Number(await env.SUBSCRIPTIONS.get(key) || 0)
   if (current >= SUBSCRIPTION_RATE_LIMIT.max) {
-    return json({ error: 'Too many subscription requests. Try again later.' }, 429, 'POST,OPTIONS', request)
+    return json({ error: 'Too many subscription requests. Try again later.' }, 429, 'POST,OPTIONS', request, env)
   }
   await env.SUBSCRIPTIONS.put(key, String(current + 1), {
     expirationTtl: SUBSCRIPTION_RATE_LIMIT.windowSeconds * 2,
@@ -126,7 +126,7 @@ async function handleSubscription(pathname, env, request) {
   if (!env.SUBSCRIPTIONS) {
     return new Response('KV binding SUBSCRIPTIONS is not available.', {
       status: 500,
-      headers: subscriptionHeaders(request),
+      headers: subscriptionHeaders(request, env),
     })
   }
 
@@ -135,7 +135,7 @@ async function handleSubscription(pathname, env, request) {
   if (!record) {
     return new Response('Subscription not found.', {
       status: 404,
-      headers: subscriptionHeaders(request),
+      headers: subscriptionHeaders(request, env),
     })
   }
 
@@ -149,6 +149,6 @@ async function handleSubscription(pathname, env, request) {
 
   return new Response(yaml.endsWith('\n') ? yaml : `${yaml}\n`, {
     status: 200,
-    headers: subscriptionHeaders(request),
+    headers: subscriptionHeaders(request, env),
   })
 }
