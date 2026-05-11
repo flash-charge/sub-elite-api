@@ -1,0 +1,21 @@
+{
+  "name": "sub-elite-api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "lint": "node ./node_modules/eslint/bin/eslint.js .",
+    "test": "node --experimental-strip-types --test server/converter.test.js",
+    "worker:check": "wrangler deploy --dry-run",
+    "worker:deploy": "wrangler deploy"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.2",
+    "eslint": "^10.2.1",
+    "globals": "^17.5.0",
+    "typescript-eslint": "^8.58.2",
+    "wrangler": "^4.90.0"
+  }
+}
