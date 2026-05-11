@@ -36,7 +36,7 @@ preview_urls = false
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "804df1bbafd644ad83b42f91161a547e"
+id = "65fd37b0b58e46e89b4caaf06425199a"
 ```
 
 KV namespace:
