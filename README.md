@@ -53,30 +53,29 @@ SUB_ELITE_PROXY_SECRET=<same-random-secret-as-pages>
 
 Set the same value in the `sub-elite` Pages project. When this secret is configured, `POST /api/convert` and `POST /api/subscriptions` require the Pages proxy header and direct Worker POST requests are rejected.
 
-## Deploy With Cloudflare Workers Git
+## Deployment Guide
 
-Use these settings in Cloudflare Workers Git deploy:
+### 1. Cloudflare KV Setup
+Create a KV namespace in your Cloudflare dashboard named `sub-elite` (or any name) and copy the ID. Update `wrangler.toml`:
 
-```text
-Build command: npm ci
-Deploy command: npx wrangler deploy
+```toml
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "<your-kv-id>"
 ```
 
-Expected Worker URL:
+### 2. Environment Variables
+Set these in the Cloudflare Worker dashboard (**Settings > Variables**):
 
-```text
-https://sub-elite-api.<account>.workers.dev
-```
+- `SUB_ELITE_PROXY_SECRET`: A random string (must match the frontend).
+- `ALLOWED_DOMAINS`: A comma-separated list of allowed origins (e.g., `mysite.com,app.mysite.com`).
 
-After deployment, the frontend normally reaches this Worker through same-origin Pages Functions. If the Worker URL changes, set this value in the frontend Cloudflare Pages project:
+### 3. Deploy via Git
+Connect this repository to Cloudflare Workers:
+- **Build command:** `npm ci`
+- **Deploy command:** `npx wrangler deploy`
 
-```text
-SUB_ELITE_BACKEND_ORIGIN=https://sub-elite-api.<account>.workers.dev
-```
-
-Then redeploy the frontend Pages project.
-
-## API Behavior
+## Local Checks
 
 `GET /healthz`
 
