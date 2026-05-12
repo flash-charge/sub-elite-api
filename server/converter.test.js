@@ -553,7 +553,7 @@ test('buildYamlFromModel supports advanced mihomo sections', () => {
       overrideDestination: true,
       parsePureIp: false,
       forceDnsMapping: true,
-      sniff: ['TLS:443'],
+      sniff: { TLS: { ports: [443], 'override-destination': true } },
       forceDomain: ['+.example.com'],
       skipDomain: ['+.skip.example'],
       skipSrcAddress: ['192.168.0.0/16'],
@@ -578,6 +578,7 @@ test('buildYamlFromModel supports advanced mihomo sections', () => {
   assert.match(yaml, /interface-name: "rmnet_data0"/)
   assert.match(yaml, /external-ui-url: "https:\/\/example\.com\/ui\.zip"/)
   assert.match(yaml, /force-dns-mapping: true/)
+  assert.match(yaml, /TLS:\n\s+ports:\n\s+- 443\n\s+override-destination: true/)
   assert.match(yaml, /skip-src-address:/)
   assert.match(yaml, /proxy-providers:/)
   assert.match(yaml, /use:\n\s+- "remote"/)
