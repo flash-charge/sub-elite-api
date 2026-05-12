@@ -566,9 +566,9 @@ function parseShadowsocks(link) {
     proxy.plugin = parts[0]
     const opts = {}
     for (let i = 1; i < parts.length; i++) {
-      const [key, value] = parts[i].split('=')
+      const [key, ...valueParts] = parts[i].split('=')
       if (key) {
-        opts[key] = value !== undefined ? decodeText(value) : true
+        opts[key] = valueParts.length ? decodeText(valueParts.join('=')) : true
       }
     }
     proxy['plugin-opts'] = opts

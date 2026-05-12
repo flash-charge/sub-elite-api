@@ -859,6 +859,14 @@ test('parseLink converts shadowsocks link with plugin (SIP003)', () => {
   })
 })
 
+test('parseLink keeps equals signs inside shadowsocks plugin option values', () => {
+  const link = 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNzd29yZA==@example.com:443/?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Da%3Db.example.com#PluginEquals'
+  const proxy = parseLink(link)
+
+  assert.equal(proxy.plugin, 'obfs-local')
+  assert.equal(proxy['plugin-opts']['obfs-host'], 'a=b.example.com')
+})
+
 test('parseLink converts shadowsocks link with v2ray-plugin', () => {
   const link = 'ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNzd29yZA==@example.com:443/?plugin=v2ray-plugin%3Bmode%3Dwebsocket%3Bpath%3D%2Fv2ray%3Bhost%3Dexample.com%3Btls#V2Ray'
   const proxy = parseLink(link)
