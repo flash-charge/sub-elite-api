@@ -29,7 +29,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['functions/**/*.js'],
+    files: ['functions/**/*.js', 'worker/**/*.js'],
     extends: [js.configs.recommended],
     languageOptions: {
       globals: {

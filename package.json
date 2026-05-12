@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "lint": "node ./node_modules/eslint/bin/eslint.js .",
+    "typecheck": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm test && npm run worker:check",
     "test": "node --experimental-strip-types --test server/converter.test.js",
-    "worker:check": "wrangler deploy --dry-run",
-    "worker:deploy": "wrangler deploy"
+    "worker:check": "node ./node_modules/wrangler/bin/wrangler.js deploy --dry-run",
+    "worker:deploy": "node ./node_modules/wrangler/bin/wrangler.js deploy"
   },
   "dependencies": {},
   "devDependencies": {
@@ -15,6 +17,7 @@
     "@types/node": "^24.12.2",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",
+    "typescript": "~6.0.3",
     "typescript-eslint": "^8.58.2",
     "wrangler": "^4.90.0"
   }

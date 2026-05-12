@@ -206,9 +206,9 @@ export function validateConfigModel(model) {
   const proxyProviderNames = normalizedModel.proxyProviders.map((provider) => provider.name).filter(Boolean)
   const duplicateProviders = providerNames.filter((name, index) => providerNames.indexOf(name) !== index)
   const duplicateProxyProviders = proxyProviderNames.filter((name, index) => proxyProviderNames.indexOf(name) !== index)
-  const errors = []
-  const warnings = []
-  const issues = []
+  const errors: string[] = []
+  const warnings: string[] = []
+  const issues: ProxyNode[] = []
 
   const addIssue = (severity, location, message, code) => {
     issues.push({ severity, location, message, code })
@@ -319,7 +319,7 @@ export function validateConfigModel(model) {
 
 export function autoFixConfigModel(model) {
   const fixed = normalizeModel(model)
-  const fixes = []
+  const fixes: string[] = []
 
   fixed.proxies.forEach((proxy) => {
     const port = Number(proxy.port)
@@ -1179,7 +1179,7 @@ function buildProxyGroups(model, proxies) {
     const type = groupTypes.includes(group.type) ? group.type : 'select'
     const names = Array.isArray(group.proxies) && group.proxies.length > 0 ? group.proxies : proxyNames
     const filteredNames = names.filter((name) => proxyNames.includes(name) || specialNames.includes(name) || name === 'AUTO')
-    const normalizedGroup = {
+    const normalizedGroup: ProxyNode = {
       name: group.name || 'PROXY',
       type,
       proxies: filteredNames.length ? filteredNames : ['DIRECT'],
@@ -1241,7 +1241,7 @@ function dumpYaml(value, indent = 0) {
 function spaceTopLevelSections(yaml) {
   const sectionKeys = new Set(['dns', 'sniffer', 'tun', 'ntp', 'experimental', 'proxies', 'proxy-providers', 'proxy-groups', 'listeners', 'rule-providers', 'sub-rules', 'tunnels', 'rules'])
   const lines = String(yaml).split('\n')
-  const spaced = []
+  const spaced: string[] = []
 
   lines.forEach((line, index) => {
     const key = line.match(/^([A-Za-z0-9_-]+):/)?.[1]
@@ -1364,7 +1364,7 @@ function normalizeModel(model) {
   }
 }
 
-function normalizeDns(dns = {}) {
+function normalizeDns(dns: ProxyNode = {}) {
   const defaults = createConfigModel([]).dns
   return {
     enable: dns.enable !== false,
@@ -1393,7 +1393,7 @@ function normalizeDns(dns = {}) {
   }
 }
 
-function normalizeGeneral(general = {}) {
+function normalizeGeneral(general: ProxyNode = {}) {
   const defaults = createGeneral()
   return {
     ...defaults,
@@ -1438,14 +1438,14 @@ function normalizeGeneral(general = {}) {
   }
 }
 
-function normalizeProfile(profile = {}) {
+function normalizeProfile(profile: ProxyNode = {}) {
   return {
     storeSelected: Boolean(profile.storeSelected ?? profile['store-selected'] ?? createProfile().storeSelected),
     storeFakeIp: Boolean(profile.storeFakeIp ?? profile['store-fake-ip'] ?? createProfile().storeFakeIp),
   }
 }
 
-function normalizeSniffer(sniffer = {}) {
+function normalizeSniffer(sniffer: ProxyNode = {}) {
   const defaults = createSniffer()
   return {
     enable: Boolean(sniffer.enable),
@@ -1460,7 +1460,7 @@ function normalizeSniffer(sniffer = {}) {
   }
 }
 
-function normalizeTun(tun = {}) {
+function normalizeTun(tun: ProxyNode = {}) {
   const defaults = createTun()
   return {
     enable: Boolean(tun.enable),
@@ -1494,7 +1494,7 @@ function normalizeTun(tun = {}) {
   }
 }
 
-function normalizeNtp(ntp = {}) {
+function normalizeNtp(ntp: ProxyNode = {}) {
   const defaults = createNtp()
   return {
     enable: Boolean(ntp.enable),
@@ -1505,12 +1505,12 @@ function normalizeNtp(ntp = {}) {
   }
 }
 
-function normalizeObject(value = {}) {
+function normalizeObject(value: ProxyNode = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return { ...value }
 }
 
-function normalizeRawSections(value = {}) {
+function normalizeRawSections(value: ProxyNode = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(
     Object.entries(value)
@@ -1525,7 +1525,7 @@ function normalizeRawSection(value) {
   return Object.keys(normalized).length ? normalized : undefined
 }
 
-function normalizeGeo(geo = {}) {
+function normalizeGeo(geo: ProxyNode = {}) {
   return {
     ...createGeo(),
     ...geo,
@@ -1539,7 +1539,7 @@ function normalizeGeo(geo = {}) {
   }
 }
 
-function normalizeRuleProvider(provider = {}) {
+function normalizeRuleProvider(provider: ProxyNode = {}) {
   return {
     name: String(provider.name || '').trim(),
     type: String(provider.type || 'http').trim(),
@@ -1556,7 +1556,7 @@ function normalizeRuleProvider(provider = {}) {
   }
 }
 
-function normalizeProxyProvider(provider = {}) {
+function normalizeProxyProvider(provider: ProxyNode = {}) {
   return {
     name: String(provider.name || '').trim(),
     type: ['http', 'file', 'inline'].includes(provider.type) ? provider.type : 'http',
@@ -1582,7 +1582,7 @@ function normalizeProxyProvider(provider = {}) {
   }
 }
 
-function normalizeGroup(group = {}) {
+function normalizeGroup(group: ProxyNode = {}) {
   return {
     name: String(group.name || 'PROXY').trim(),
     type: groupTypes.includes(group.type) ? group.type : 'select',
@@ -1608,7 +1608,7 @@ function normalizeGroup(group = {}) {
   }
 }
 
-function normalizeTunnel(tunnel = {}) {
+function normalizeTunnel(tunnel: ProxyNode = {}) {
   return compact({
     network: normalizeList(tunnel.network, ['tcp', 'udp']),
     address: String(tunnel.address || '').trim(),
