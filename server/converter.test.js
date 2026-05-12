@@ -738,6 +738,28 @@ test('buildYamlFromModel supports visual Mihomo wiki fields for general, tun, an
   assert.match(yaml, /mptcp: true/)
 })
 
+test('buildYamlFromModel accepts object-shaped sniffer sniff config', () => {
+  const yaml = buildYamlFromModel({
+    template: 'full',
+    sniffer: {
+      enable: true,
+      sniff: {
+        TLS: { ports: [443, 8443] },
+        HTTP: { ports: ['80', '8080-8880'] },
+        QUIC: { ports: 443 },
+      },
+    },
+    proxies: [],
+    groups: [{ name: 'PROXY', type: 'select', proxies: ['DIRECT'] }],
+    rules: ['MATCH,DIRECT'],
+  })
+
+  assert.match(yaml, /sniffer:/)
+  assert.match(yaml, /TLS:/)
+  assert.match(yaml, /- 8443/)
+  assert.match(yaml, /8080-8880/)
+})
+
 test('convert warnings include protocol and input snippet', () => {
   const result = convertToClashMeta('trojan://missing-port')
 
