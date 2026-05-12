@@ -1,14 +1,24 @@
 import js from '@eslint/js'
 import globals from 'globals'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import tseslint from 'typescript-eslint'
 
 export default defineConfig([
   globalIgnores(['dist', 'node_modules']),
   {
-    files: ['src/**/*.js'],
-    extends: [js.configs.recommended],
+    files: ['lib/**/*.ts'],
+    extends: [
+      js.configs.recommended,
+      ...tseslint.configs.recommended,
+    ],
     languageOptions: {
-      globals: globals.browser,
+      parser: tseslint.parser,
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {
