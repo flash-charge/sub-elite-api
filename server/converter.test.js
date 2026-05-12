@@ -319,6 +319,31 @@ test('blank builder config is exportable with warnings only', () => {
   assert.match(yaml, /MATCH,PROXY/)
 })
 
+test('buildYamlFromModel ignores malformed array entries in model sections', () => {
+  const yaml = buildYamlFromModel({
+    template: 'full',
+    proxies: [
+      'bad-proxy',
+      { name: 'A', type: 'trojan', server: 'a.example', port: 443, password: 'x', enabled: true },
+    ],
+    groups: [
+      123,
+      { name: 'PROXY', type: 'select', proxies: ['A'] },
+    ],
+    proxyProviders: ['bad-provider'],
+    ruleProviders: ['bad-rule-provider'],
+    listeners: ['bad-listener'],
+    tunnels: ['bad-tunnel'],
+    rules: ['MATCH,PROXY'],
+  })
+
+  assert.match(yaml, /name: "A"/)
+  assert.doesNotMatch(yaml, /bad-proxy/)
+  assert.doesNotMatch(yaml, /bad-provider/)
+  assert.doesNotMatch(yaml, /bad-listener/)
+  assert.doesNotMatch(yaml, /bad-tunnel/)
+})
+
 test('extra top-level config is preserved when building yaml', () => {
   const yaml = buildYamlFromModel({
     template: 'full',

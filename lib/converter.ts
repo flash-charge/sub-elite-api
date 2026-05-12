@@ -1378,15 +1378,15 @@ function normalizeModel(model) {
     ntp: normalizeNtp(model?.ntp),
     experimental: normalizeObject(model?.experimental),
     geo: normalizeGeo(model?.geo),
-    ruleProviders: Array.isArray(model?.ruleProviders) ? model.ruleProviders.map(normalizeRuleProvider) : [],
-    proxyProviders: Array.isArray(model?.proxyProviders) ? model.proxyProviders.map(normalizeProxyProvider) : [],
-    listeners: Array.isArray(model?.listeners) ? model.listeners.filter((listener) => listener && typeof listener === 'object') : [],
+    ruleProviders: Array.isArray(model?.ruleProviders) ? model.ruleProviders.filter(isPlainObject).map(normalizeRuleProvider) : [],
+    proxyProviders: Array.isArray(model?.proxyProviders) ? model.proxyProviders.filter(isPlainObject).map(normalizeProxyProvider) : [],
+    listeners: Array.isArray(model?.listeners) ? model.listeners.filter(isPlainObject) : [],
     subRules: normalizeSubRules(model?.subRules || model?.['sub-rules']),
-    tunnels: Array.isArray(model?.tunnels) ? model.tunnels.map(normalizeTunnel) : [],
+    tunnels: Array.isArray(model?.tunnels) ? model.tunnels.filter(isPlainObject).map(normalizeTunnel) : [],
     extraTopLevel: model?.extraTopLevel && typeof model.extraTopLevel === 'object' && !Array.isArray(model.extraTopLevel) ? model.extraTopLevel : {},
     rawSections: normalizeRawSections(model?.rawSections),
-    proxies: Array.isArray(model?.proxies) ? model.proxies.map((proxy) => ({ ...proxy })) : [],
-    groups: Array.isArray(model?.groups) ? model.groups.map(normalizeGroup) : [],
+    proxies: Array.isArray(model?.proxies) ? model.proxies.filter(isPlainObject).map((proxy) => ({ ...proxy })) : [],
+    groups: Array.isArray(model?.groups) ? model.groups.filter(isPlainObject).map(normalizeGroup) : [],
     rules: Array.isArray(model?.rules) ? model.rules.map((rule) => String(rule).trim()).filter(Boolean) : [],
   }
 }
@@ -1535,6 +1535,10 @@ function normalizeNtp(ntp: ProxyNode = {}) {
 function normalizeObject(value: ProxyNode = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return { ...value }
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
 function normalizeRawSections(value: ProxyNode = {}) {
