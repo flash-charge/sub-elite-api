@@ -250,7 +250,7 @@ Returns:
 
 `POST /api/convert`
 
-Converts pasted proxy links or Mihomo YAML into the app config model and YAML output.
+Converts pasted proxy links or base64 subscription text into the app config model and YAML output. Do not send `http://` or `https://` subscription URLs to this endpoint; fetch the subscription content first, then send the actual config links.
 
 Request body:
 
