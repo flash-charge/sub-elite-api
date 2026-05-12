@@ -36,13 +36,13 @@ preview_urls = false
 
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "65fd37b0b58e46e89b4caaf06425199a"
+id = "<your-kv-id>"
 ```
 
 Production Worker URL:
 
 ```text
-https://sub-elite-api.arbalest.workers.dev
+https://<your-worker-subdomain>.workers.dev
 ```
 
 ## Required Cloudflare Settings
@@ -205,7 +205,7 @@ Then redeploy the Worker.
 ## Verify Production
 
 ```sh
-curl https://sub-elite-api.arbalest.workers.dev/healthz
+curl https://<your-worker-subdomain>.workers.dev/healthz
 ```
 
 Expected:
@@ -217,7 +217,7 @@ Expected:
 Direct POST without the proxy secret should be rejected:
 
 ```sh
-curl -X POST https://sub-elite-api.arbalest.workers.dev/api/convert \
+curl -X POST https://<your-worker-subdomain>.workers.dev/api/convert \
   -H 'content-type: application/json' \
   --data '{"input":"trojan://secret@example.com:443#Test"}'
 ```
@@ -231,7 +231,7 @@ Expected:
 Through the frontend Pages proxy, the same request should succeed:
 
 ```sh
-curl -X POST https://sub-elite-d3e.pages.dev/api/convert \
+curl -X POST https://<your-pages-domain>/api/convert \
   -H 'content-type: application/json' \
   --data '{"input":"trojan://secret@example.com:443#Test"}'
 ```
@@ -257,8 +257,8 @@ Request body:
 ```json
 {
   "input": "vmess://...",
-  "template": "simple",
-  "rulesPreset": "default",
+  "template": "full",
+  "rulesPreset": "proxy",
   "namePattern": "{name}",
   "namePrefix": ""
 }
