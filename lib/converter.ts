@@ -385,6 +385,7 @@ export function extractLinks(input) {
 
   for (const candidate of candidates) {
     const links = candidate
+      .replace(/,(?=(?:vmess|vless|trojan|ss|ssr|socks|socks5|hysteria|hysteria2|hy2|tuic|wireguard):\/\/)/gi, '\n')
       .split(/\r?\n/)
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('#') && !line.startsWith('//'))

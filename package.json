@@ -11,14 +11,13 @@
     "worker:check": "node ./node_modules/wrangler/bin/wrangler.js deploy --dry-run",
     "worker:deploy": "node ./node_modules/wrangler/bin/wrangler.js deploy"
   },
-  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^24.12.2",
+    "@types/node": "^24.12.4",
     "eslint": "^10.2.1",
     "globals": "^17.5.0",
     "typescript": "~6.0.3",
-    "typescript-eslint": "^8.58.2",
-    "wrangler": "^4.90.0"
+    "typescript-eslint": "^8.59.3",
+    "wrangler": "^4.90.1"
   }
 }

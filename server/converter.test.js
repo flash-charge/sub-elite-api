@@ -12,6 +12,17 @@ test('extractLinks decodes base64 subscription text', () => {
   assert.deepEqual(extractLinks(encoded), source.split('\n'))
 })
 
+test('extractLinks supports comma-separated config links', () => {
+  const links = [
+    'vmess://eyJwcyI6IkNvbW1hIFZNZXNzIiwiYWRkIjoiZXhhbXBsZS5jb20iLCJwb3J0IjoiNDQzIiwiaWQiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEiLCJhaWQiOiIwIiwic2N5IjoiYXV0byIsIm5ldCI6IndzIiwidGxzIjoidGxzIn0=',
+    'vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&alpn=h2,http/1.1#Comma%20VLESS',
+    'trojan://secret@example.com:443?sni=example.com#Comma%20Trojan',
+  ]
+
+  assert.deepEqual(extractLinks(links.join(',')), links)
+  assert.equal(convertToClashMeta(links.join(',')).stats.converted, 3)
+})
+
 test('parseLink converts vmess json payload', () => {
   const payload = Buffer.from(
     JSON.stringify({
