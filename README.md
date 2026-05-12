@@ -68,7 +68,6 @@ id = "<your-kv-id>"
 Set these in the Cloudflare Worker dashboard (**Settings > Variables**):
 
 - `SUB_ELITE_PROXY_SECRET`: A random string (must match the frontend).
-- `ALLOWED_DOMAINS`: A comma-separated list of allowed origins (e.g., `mysite.com,app.mysite.com`).
 
 ### 3. Deploy via Git
 Connect this repository to Cloudflare Workers:
@@ -147,8 +146,7 @@ Subscription URLs are secret URLs. Anyone with the URL can read the generated co
 
 ## Exposure Controls
 
-- CORS is restricted to `sub-elite.pages.dev`, preview hosts ending in `.sub-elite.pages.dev`, and local development hosts.
-- `POST /api/convert` and `POST /api/subscriptions` reject requests from other origins.
+- CORS is universal and reflects the request `Origin`, or `*` when no `Origin` header is present.
 - If `SUB_ELITE_PROXY_SECRET` is configured, POST endpoints require the Pages Function proxy secret header.
 - `POST /api/subscriptions` has a lightweight per-IP KV rate limit.
 - The create-subscription response returns only the full `url`, not the raw secret as a separate field.
