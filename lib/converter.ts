@@ -157,16 +157,16 @@ export function buildYamlFromModel(model: any) {
     dns: normalizeRawSection(normalizedModel.rawSections.dns) || buildDns(normalizedModel.dns),
     ...buildSniffer(normalizedModel.sniffer, normalizedModel.rawSections.sniffer),
     ...buildTun(normalizedModel.tun, normalizedModel.rawSections.tun),
-    ...buildNtp(normalizedModel.ntp, normalizedModel.rawSections.ntp),
-    ...buildExperimental(normalizedModel.experimental, normalizedModel.rawSections.experimental),
+    ...buildListeners(normalizedModel.listeners),
     proxies,
     ...buildProxyProviders(normalizedModel.proxyProviders),
     'proxy-groups': buildProxyGroups(normalizedModel, proxies),
-    ...buildListeners(normalizedModel.listeners),
+    rules: normalizedModel.rules.length ? normalizedModel.rules : ['MATCH,PROXY'],
     ...buildRuleProviders(normalizedModel.ruleProviders),
     ...buildSubRules(normalizedModel.subRules),
     ...buildTunnels(normalizedModel.tunnels),
-    rules: normalizedModel.rules.length ? normalizedModel.rules : ['MATCH,PROXY'],
+    ...buildNtp(normalizedModel.ntp, normalizedModel.rawSections.ntp),
+    ...buildExperimental(normalizedModel.experimental, normalizedModel.rawSections.experimental),
   }
 
   return `${spaceTopLevelSections(dumpYaml(config))}\n`

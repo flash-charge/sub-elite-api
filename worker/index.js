@@ -30,7 +30,7 @@ export default {
       if (/^\/api\/subscriptions\/[A-Za-z0-9_-]+$/u.test(pathname) && request.method === 'DELETE') {
         return handleDeleteSubscription(pathname, request, env)
       }
-      if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname) && request.method === 'GET') {
+      if (/^\/sub\/[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+\.ya?ml$/u.test(pathname) && request.method === 'GET') {
         return handleSubscription(pathname, env, request)
       }
 
@@ -46,7 +46,7 @@ function handleOptions(pathname, request, env) {
   if (pathname === '/api/convert') return options('POST,OPTIONS', request, env)
   if (pathname === '/api/subscriptions') return options('GET,POST,OPTIONS', request, env)
   if (/^\/api\/subscriptions\/[A-Za-z0-9_-]+$/u.test(pathname)) return options('DELETE,OPTIONS', request, env)
-  if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname)) {
+  if (/^\/sub\/[A-Za-z0-9_-]+\/[A-Za-z0-9._-]+\.ya?ml$/u.test(pathname)) {
     return new Response(null, { status: isAllowedOrigin(request, env) ? 204 : 403, headers: subscriptionHeaders(request, env) })
   }
   return options('GET,POST,OPTIONS', request, env)
@@ -97,7 +97,8 @@ async function handleCreateSubscription(request, env) {
     return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
   }
 
-  const expiresIn = Object.hasOwn(SUBSCRIPTION_EXPIRY, payload.expiresIn) ? payload.expiresIn : '30d'
+  const expiresIn = Object.hasOwn(SUBSCRIPTION_EXPIRY, payload.expiresIn) ? payload.expiresIn : 'never'
+  const filename = normalizeSubscriptionFilename(payload.filename)
   const secret = randomSecret(32)
   const record = JSON.stringify({
     yaml,
@@ -117,7 +118,7 @@ async function handleCreateSubscription(request, env) {
 
   return json({
     ok: true,
-    url: new URL(`/sub/${secret}/config.yaml`, request.url).toString(),
+    url: new URL(`/sub/${secret}/${filename}`, request.url).toString(),
     expiresIn,
   }, 200, 'POST,OPTIONS', request, env)
 }
@@ -254,4 +255,9 @@ function concatUint8(chunks, size) {
   let offset = 0
   for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength }
   return result
+}
+
+function normalizeSubscriptionFilename(value) {
+  const name = String(value || 'config.yaml').trim().replace(/[^A-Za-z0-9._-]/g, '-')
+  return /\.ya?ml$/i.test(name) ? name : 'config.yaml'
 }
