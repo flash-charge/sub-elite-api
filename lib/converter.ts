@@ -503,7 +503,6 @@ function buildRules(rulesPreset) {
       'IP-CIDR,172.16.0.0/12,DIRECT',
       'IP-CIDR,192.168.0.0/16,DIRECT',
       'IP-CIDR,127.0.0.0/8,DIRECT',
-      'GEOSITE,category-id,DIRECT',
       'GEOIP,ID,DIRECT',
       'MATCH,PROXY',
     ]
