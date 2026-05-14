@@ -1470,7 +1470,7 @@ function normalizeGeneral(general: ProxyNode = {}) {
     externalControllerTls: String(general.externalControllerTls || general['external-controller-tls'] || '').trim(),
     externalControllerUnix: String(general.externalControllerUnix || general['external-controller-unix'] || '').trim(),
     externalControllerPipe: String(general.externalControllerPipe || general['external-controller-pipe'] || '').trim(),
-    externalControllerCors: String(general.externalControllerCors || general['external-controller-cors'] || '').trim(),
+    externalControllerCors: normalizeControllerCors(general.externalControllerCors || general['external-controller-cors']),
     externalUi: String(general.externalUi || general['external-ui'] || '').trim(),
     externalUiName: String(general.externalUiName || general['external-ui-name'] || '').trim(),
     externalUiUrl: String(general.externalUiUrl || general['external-ui-url'] || '').trim(),
@@ -1482,6 +1482,12 @@ function normalizeGeneral(general: ProxyNode = {}) {
     tlsPrivateKey: String(general.tlsPrivateKey || general.tls?.['private-key'] || '').trim(),
     tlsCustom: normalizeObject(general.tlsCustom || {}),
   }
+}
+
+function normalizeControllerCors(value) {
+  if (!value) return ''
+  if (typeof value === 'object' && !Array.isArray(value)) return value
+  return String(value).trim()
 }
 
 function normalizeProfile(profile: ProxyNode = {}) {
