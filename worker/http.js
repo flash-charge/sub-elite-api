@@ -70,7 +70,7 @@ export function randomSecret(length) {
 
 export function hasHttpUrl(input) {
   return input
-    .split(/\s+/)
+    .split(/[\s,]+/)
     .some((item) => /^https?:\/\//i.test(item.trim()))
 }
 

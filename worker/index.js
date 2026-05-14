@@ -49,10 +49,11 @@ function handleOptions(pathname, request, env) {
 async function handleConvert(request, env) {
   if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'POST,OPTIONS', request, env)
 
-  const contentLength = Number(request.headers.get('content-length') || 0)
-  if (contentLength > MAX_INPUT_BYTES) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request, env)
+  const body = await readLimitedBody(request, MAX_INPUT_BYTES)
+  if (body === null) return json({ error: 'Input is too large.' }, 413, 'POST,OPTIONS', request, env)
 
-  const payload = await request.json().catch(() => null)
+  let payload
+  try { payload = JSON.parse(body) } catch { payload = null }
   if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request, env)
 
   const input = String(payload.input || '').trim()
@@ -74,15 +75,14 @@ async function handleCreateSubscription(request, env) {
     return json({ error: 'Content-Type must be application/json.' }, 415, 'POST,OPTIONS', request, env)
   }
 
-  const contentLength = Number(request.headers.get('content-length') || 0)
-  if (contentLength > MAX_SUBSCRIPTION_BYTES + 4096) {
-    return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
-  }
-
   const rateLimitResponse = await checkSubscriptionRateLimit(request, env)
   if (rateLimitResponse) return rateLimitResponse
 
-  const payload = await request.json().catch(() => null)
+  const body = await readLimitedBody(request, MAX_SUBSCRIPTION_BYTES + 4096)
+  if (body === null) return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
+
+  let payload
+  try { payload = JSON.parse(body) } catch { payload = null }
   if (!payload) return json({ error: 'Body must be valid JSON.' }, 400, 'POST,OPTIONS', request, env)
 
   const yaml = String(payload.yaml || '').trim()
@@ -151,12 +151,42 @@ async function handleSubscription(pathname, env, request) {
   try {
     const parsed = JSON.parse(record)
     if (parsed && typeof parsed.yaml === 'string') yaml = parsed.yaml
+    else yaml = record.startsWith('{') ? '' : record
   } catch {
-    yaml = record
+    // not JSON — use record as-is
+  }
+
+  if (!yaml) {
+    return new Response('Subscription data is corrupted.', {
+      status: 500,
+      headers: subscriptionHeaders(request, env),
+    })
   }
 
   return new Response(yaml.endsWith('\n') ? yaml : `${yaml}\n`, {
     status: 200,
     headers: subscriptionHeaders(request, env),
   })
+}
+
+async function readLimitedBody(request, maxBytes) {
+  const reader = request.body?.getReader()
+  if (!reader) return ''
+  const chunks = []
+  let size = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > maxBytes) { reader.cancel(); return null }
+    chunks.push(value)
+  }
+  return new TextDecoder().decode(chunks.length === 1 ? chunks[0] : concatUint8(chunks, size))
+}
+
+function concatUint8(chunks, size) {
+  const result = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength }
+  return result
 }

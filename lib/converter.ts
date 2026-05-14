@@ -441,7 +441,7 @@ function parseVmess(link) {
     alterId: Number(data.aid || 0),
     cipher: data.scy || 'auto',
     tls: data.tls === 'tls',
-    servername: data.sni || data.host,
+    servername: data.sni || (data.host && !data.host.includes(',') ? data.host : undefined),
     network: normalizeTransport(data.net),
   })
 
@@ -530,7 +530,7 @@ function parseTrojan(link) {
 function parseShadowsocks(link) {
   const raw = link.replace(/^ss:\/\//i, '')
   const [withoutHash, hash = ''] = raw.split('#')
-  const name = cleanName(hash ? decodeText(hash) : 'ss')
+  const name = cleanName(hash || 'ss')
   const [mainPart, queryPart = ''] = withoutHash.split('?')
 
   const decodedMain = tryBase64Decode(decodeText(mainPart))
@@ -585,16 +585,23 @@ function parseShadowsocksR(link) {
   const parts = main.split(':')
   if (parts.length < 6) throw new Error('SSR format is incomplete')
 
+  const server = parts.slice(0, parts.length - 5).join(':')
+  const port = parts[parts.length - 5]
+  const protocol = parts[parts.length - 4]
+  const cipher = parts[parts.length - 3]
+  const obfs = parts[parts.length - 2]
+  const passwordB64 = parts[parts.length - 1]
+
   const params = new URLSearchParams(rawParams)
   return compact({
-    name: cleanName(base64Param(params, 'remarks') || parts[0] || 'ssr'),
+    name: cleanName(base64Param(params, 'remarks') || server || 'ssr'),
     type: 'ssr',
-    server: required(parts[0], 'server'),
-    port: toPort(parts[1]),
-    cipher: required(parts[3], 'cipher'),
-    password: required(tryBase64Decode(parts.slice(5).join(':')), 'password'),
-    protocol: required(parts[2], 'protocol'),
-    obfs: required(parts[4], 'obfs'),
+    server: required(server.replace(/^\[|\]$/g, ''), 'server'),
+    port: toPort(port),
+    cipher: required(cipher, 'cipher'),
+    password: required(tryBase64Decode(passwordB64), 'password'),
+    protocol: required(protocol, 'protocol'),
+    obfs: required(obfs, 'obfs'),
     'protocol-param': base64Param(params, 'protoparam') || undefined,
     'obfs-param': base64Param(params, 'obfsparam') || undefined,
   })
@@ -627,7 +634,7 @@ function parseHysteria(link) {
     type: 'hysteria',
     server: required(url.hostname, 'server'),
     port: toPort(url.port),
-    'auth-str': decodeText(url.username || params.get('auth-str') || params.get('auth_str') || params.get('auth') || ''),
+    'auth-str': required(decodeText(url.username || params.get('auth-str') || params.get('auth_str') || params.get('auth') || ''), 'auth-str'),
     alpn: params.get('alpn')?.split(',') || undefined,
     protocol: params.get('protocol') || undefined,
     up: params.get('up') || undefined,
@@ -1237,7 +1244,8 @@ function buildProxyGroups(model, proxies) {
   })
 }
 
-function dumpYaml(value, indent = 0) {
+function dumpYaml(value, indent = 0, maxDepth = 20) {
+  if (maxDepth <= 0) return `${' '.repeat(indent)}"[max depth]"`
   const pad = ' '.repeat(indent)
 
   if (Array.isArray(value)) {
@@ -1245,7 +1253,7 @@ function dumpYaml(value, indent = 0) {
     return value
       .map((item) => {
         if (isScalar(item)) return `${pad}- ${formatScalar(item, indent)}`
-        return `${pad}-\n${dumpYaml(item, indent + 2)}`
+        return `${pad}-\n${dumpYaml(item, indent + 2, maxDepth - 1)}`
       })
       .join('\n')
   }
@@ -1257,7 +1265,7 @@ function dumpYaml(value, indent = 0) {
       .map(([key, entryValue]) => {
         const formattedKey = formatKey(key)
         if (isScalar(entryValue)) return `${pad}${formattedKey}: ${formatScalar(entryValue, indent)}`
-        return `${pad}${formattedKey}:\n${dumpYaml(entryValue, indent + 2)}`
+        return `${pad}${formattedKey}:\n${dumpYaml(entryValue, indent + 2, maxDepth - 1)}`
       })
       .join('\n')
   }
@@ -1286,7 +1294,8 @@ function formatKey(key) {
 
 function formatScalar(value, indent = 0) {
   if (value === null) return 'null'
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'null'
+  if (typeof value === 'boolean') return String(value)
   const str = String(value)
   if (str.includes('\n')) {
     const scalarPad = ' '.repeat(indent + 2)
@@ -1307,12 +1316,19 @@ function isEmptyProxyField(value) {
 }
 
 function makeUniqueNames(proxies) {
+  const assigned = new Set()
   const seen = new Map()
   for (const proxy of proxies) {
     const base = proxy.name || `${proxy.type}-${proxy.server}`
     const count = seen.get(base) || 0
     seen.set(base, count + 1)
-    proxy.name = count === 0 ? base : `${base} ${count + 1}`
+    let candidate = count === 0 ? base : `${base} ${count + 1}`
+    while (assigned.has(candidate)) {
+      seen.set(base, seen.get(base) + 1)
+      candidate = `${base} ${seen.get(base)}`
+    }
+    proxy.name = candidate
+    assigned.add(candidate)
   }
 }
 
@@ -1814,7 +1830,8 @@ function getProtocol(line) {
 
 function snippet(value) {
   const text = String(value || '').trim()
-  return text.length > 96 ? `${text.slice(0, 96)}...` : text
+  const redacted = text.replace(/^((?:wireguard|trojan|hy2|hysteria2|tuic):\/\/)[^@]+@/i, '$1***@')
+  return redacted.length > 96 ? `${redacted.slice(0, 96)}...` : redacted
 }
 
 function required(value, field) {
