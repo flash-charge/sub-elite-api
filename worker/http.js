@@ -31,7 +31,8 @@ export function options(methods = 'GET,POST,OPTIONS', request, env) {
   })
 }
 
-export function corsHeaders(methods = 'GET,POST,OPTIONS', request) {
+// eslint-disable-next-line no-unused-vars
+export function corsHeaders(methods = 'GET,POST,OPTIONS', request, _env) {
   return {
     'access-control-allow-origin': corsOrigin(request),
     'access-control-allow-methods': methods,

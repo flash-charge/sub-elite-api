@@ -377,8 +377,8 @@ test('ws http upgrade options are emitted as booleans', () => {
     rules: ['MATCH,PROXY'],
   })
 
-  assert.match(yaml, /v2ray-http-upgrade: false/)
-  assert.match(yaml, /v2ray-http-upgrade-fast-open: false/)
+  assert.doesNotMatch(yaml, /v2ray-http-upgrade:/)
+  assert.doesNotMatch(yaml, /v2ray-http-upgrade-fast-open:/)
 })
 
 test('parseLink supports socks and hysteria links', () => {
@@ -451,7 +451,7 @@ test('buildYamlFromModel adds readable spacing between top-level sections', () =
   const result = convertToClashMeta('trojan://secret@example.com:443#Spacing')
 
   assert.match(result.yaml, /geo-update-interval: 24\n\ndns:/)
-  assert.match(result.yaml, /proxy-server-nameserver:\n\s+\[\]\n\nproxies:/)
+  assert.doesNotMatch(result.yaml, /proxy-server-nameserver:/)
   assert.match(result.yaml, /password: "secret"\n\nproxy-groups:/)
   assert.match(result.yaml, /- "Spacing"\n\nrules:/)
 })

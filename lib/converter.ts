@@ -343,7 +343,7 @@ export function autoFixConfigModel(model) {
   const groupNames = () => fixed.groups.map((group) => group.name).filter(Boolean)
   fixed.groups.forEach((group) => {
     group.proxies = group.proxies.filter((name) =>
-      enabledProxyNames.includes(name) || groupNames().includes(name) || ['DIRECT', 'REJECT'].includes(name),
+      name !== group.name && (enabledProxyNames.includes(name) || groupNames().includes(name) || ['DIRECT', 'REJECT'].includes(name)),
     )
     if (!group.proxies.length) {
       group.proxies = enabledProxyNames.length ? [...enabledProxyNames] : ['DIRECT']
@@ -696,15 +696,15 @@ function parseWireGuard(link) {
     ip: params.get('address') || undefined,
     'private-key': required(decodeText(url.username), 'private-key'),
     'public-key': required(params.get('publickey'), 'public-key'),
-    presharedKey: params.get('presharedkey') || undefined,
+    'pre-shared-key': params.get('presharedkey') || undefined,
     mtu: numberParam(params.get('mtu')),
     udp: true,
     peers: [{
       server: url.hostname,
       port: toPort(url.port || 51820),
       'public-key': params.get('publickey'),
-      presharedKey: params.get('presharedkey') || undefined,
-      allowedIPs: params.get('allowedips')?.split(',') || undefined,
+      'pre-shared-key': params.get('presharedkey') || undefined,
+      'allowed-ips': params.get('allowedips')?.split(',') || undefined,
     }]
   })
 }
@@ -1010,11 +1010,11 @@ function buildDns(dns) {
     'fake-ip-ttl': dns.enhancedMode === 'fake-ip' && dns.fakeIpTtl ? dns.fakeIpTtl : undefined,
     'default-nameserver': dns.defaultNameserver,
     nameserver: dns.nameserver,
-    fallback: dns.fallback,
+    fallback: dns.fallback.length ? dns.fallback : undefined,
     'fallback-filter': dns.fallbackFilter,
     'direct-nameserver': dns.directNameserver.length ? dns.directNameserver : undefined,
     'direct-nameserver-follow-policy': dns.directNameserverFollowPolicy || undefined,
-    'proxy-server-nameserver': dns.proxyServerNameserver,
+    'proxy-server-nameserver': dns.proxyServerNameserver.length ? dns.proxyServerNameserver : undefined,
     'proxy-server-nameserver-policy': dns.proxyServerNameserverPolicy,
     'nameserver-policy': dns.nameserverPolicy,
   })
@@ -1212,7 +1212,7 @@ function buildProxyGroups(model, proxies) {
   return model.groups.map((group) => {
     const type = groupTypes.includes(group.type) ? group.type : 'select'
     const names = Array.isArray(group.proxies) && group.proxies.length > 0 ? group.proxies : proxyNames
-    const filteredNames = names.filter((name) => proxyNames.includes(name) || specialNames.includes(name) || name === 'AUTO')
+    const filteredNames = names.filter((name) => name !== (group.name || 'PROXY') && (proxyNames.includes(name) || specialNames.includes(name) || name === 'AUTO'))
     const normalizedGroup: ProxyNode = {
       name: group.name || 'PROXY',
       type,
@@ -1221,7 +1221,7 @@ function buildProxyGroups(model, proxies) {
       'include-all': group.includeAll || undefined,
       'include-all-proxies': group.includeAllProxies || undefined,
       'include-all-providers': group.includeAllProviders || undefined,
-      lazy: group.lazy || undefined,
+      lazy: group.lazy === false ? false : (group.lazy || undefined),
       timeout: group.timeout || undefined,
       'max-failed-times': group.maxFailedTimes || undefined,
       'disable-udp': group.disableUdp || undefined,
@@ -1713,8 +1713,8 @@ function stripUiProxyFields(proxy) {
   if (cleanProxy.network === 'ws') {
     cleanProxy['ws-opts'] = {
       ...(cleanProxy['ws-opts'] || {}),
-      'v2ray-http-upgrade': Boolean(cleanProxy['ws-opts']?.['v2ray-http-upgrade']),
-      'v2ray-http-upgrade-fast-open': Boolean(cleanProxy['ws-opts']?.['v2ray-http-upgrade-fast-open']),
+      'v2ray-http-upgrade': cleanProxy['ws-opts']?.['v2ray-http-upgrade'] || undefined,
+      'v2ray-http-upgrade-fast-open': cleanProxy['ws-opts']?.['v2ray-http-upgrade-fast-open'] || undefined,
     }
   }
   if (cleanProxy.network === 'xhttp') applyXhttpDefaults(cleanProxy)
