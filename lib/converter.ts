@@ -1,40 +1,18 @@
-type ProxyNode = Record<string, any>
+import {
+  type ProxyNode, PROVIDER_TYPES, TRANSPORT_TYPES, TRANSPORT_TYPES_BY_PROXY,
+  TLS_FIELDS_BY_PROXY, TLS_FLAG_PROXY_TYPES, PROXY_PRIVATE_KEY_TYPES, REQUIRED_PROXY_FIELDS,
+  compact, normalizeObject, normalizeBooleanValue, isTruthyBooleanValue, normalizeProxyModelNode,
+  isPlainObject, omitKeys, normalizeList, normalizeLineList, normalizeRuleList, normalizeRuleLine,
+  splitRuleParts, hasRuleSeparator, finalizeProxyTransport, isTransportSupportedByProxy,
+  cleanupProxyTransportOptions, applyXhttpDefaults, booleanValue, normalizeTransport,
+  makeUniqueProviderNames, defaultProxyPort, getProtocol, snippet,
+  isScalar, formatKey, formatScalar, isEmptyProxyField,
+  missingProxyProviderPayloadFields, isValidProxyProviderPayloadProxy,
+} from './helpers.ts'
+import { extractLinks, parseLink } from './parsers.ts'
 
-const PROTOCOL_RE = /^(vmess|vless|trojan|ss|ssr|socks|socks5|hysteria|hysteria2|hy2|tuic|wireguard):\/\//i
-const PROVIDER_TYPES = ['http', 'file', 'inline']
-const TRANSPORT_TYPES = ['http', 'h2', 'grpc', 'ws', 'xhttp']
-const TRANSPORT_TYPES_BY_PROXY: Record<string, string[]> = {
-  vmess: ['ws', 'http', 'h2', 'grpc'],
-  vless: ['ws', 'http', 'h2', 'grpc', 'xhttp'],
-  trojan: ['ws', 'grpc'],
-}
-const TLS_FIELDS_BY_PROXY: Record<string, string[]> = {
-  vmess: ['sni', 'alpn', 'client-fingerprint', 'fingerprint', 'skip-cert-verify', 'certificate', 'private-key', 'reality', 'ech'],
-  vless: ['sni', 'alpn', 'client-fingerprint', 'fingerprint', 'skip-cert-verify', 'certificate', 'private-key', 'reality', 'ech'],
-  trojan: ['sni', 'alpn', 'client-fingerprint', 'fingerprint', 'skip-cert-verify', 'certificate', 'private-key', 'reality', 'ech'],
-  anytls: ['sni', 'alpn', 'client-fingerprint', 'fingerprint', 'skip-cert-verify'],
-  hysteria: ['sni', 'alpn', 'skip-cert-verify', 'fingerprint'],
-  hysteria2: ['sni', 'alpn', 'skip-cert-verify', 'fingerprint'],
-  tuic: ['sni', 'alpn', 'skip-cert-verify', 'fingerprint'],
-  socks5: ['sni', 'skip-cert-verify'],
-  http: ['sni', 'skip-cert-verify'],
-}
-const TLS_FLAG_PROXY_TYPES = new Set(['vmess', 'vless', 'trojan', 'socks5', 'http'])
-const PROXY_PRIVATE_KEY_TYPES = new Set(['wireguard', 'masque'])
-const REQUIRED_PROXY_FIELDS: Record<string, string[]> = {
-  vmess: ['server', 'port', 'uuid'],
-  vless: ['server', 'port', 'uuid'],
-  trojan: ['server', 'port', 'password'],
-  ss: ['server', 'port', 'cipher', 'password'],
-  ssr: ['server', 'port', 'cipher', 'password', 'protocol', 'obfs'],
-  socks5: ['server', 'port'],
-  http: ['server', 'port'],
-  hysteria: ['server', 'port', 'auth-str'],
-  hysteria2: ['server', 'port', 'password'],
-  tuic: ['server', 'port', 'uuid', 'password'],
-  wireguard: ['server', 'port', 'private-key', 'public-key'],
-  ssh: ['server', 'port', 'username'],
-}
+export { extractLinks, parseLink }
+export { type ProxyNode, omitKeys, splitRuleParts, hasRuleSeparator } from './helpers.ts'
 
 export function convertToClashMeta(input: string, options: any = {}) {
   const normalizedOptions = normalizeOptions(options)
@@ -494,416 +472,18 @@ export function autoFixConfigModel(model) {
   return { model: fixed, fixes }
 }
 
-export function extractLinks(input) {
-  const trimmed = String(input || '').trim()
-  if (!trimmed) return []
 
-  const candidates = [trimmed]
-  const decoded = tryBase64Decode(trimmed)
-  if (decoded && decoded !== trimmed) candidates.unshift(decoded)
 
-  for (const candidate of candidates) {
-    const links = candidate
-      .replace(/,(?=(?:vmess|vless|trojan|ss|ssr|socks|socks5|hysteria|hysteria2|hy2|tuic|wireguard):\/\/)/gi, '\n')
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#') && !line.startsWith('//'))
-      .flatMap((line) => {
-        const matches = line.match(/[a-z0-9+.-]+:\/\/\S+/gi)
-        return matches || [line]
-      })
-      .map((line) => line.trim().replace(/,$/, ''))
-      .filter(Boolean)
 
-    if (links.some((line) => PROTOCOL_RE.test(line))) return links
-  }
 
-  return candidates[0]
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
 
-export function parseLink(link) {
-  const protocol = link.slice(0, link.indexOf('://')).toLowerCase()
-  if (protocol === 'vmess') return parseVmess(link)
-  if (protocol === 'vless') return parseVless(link)
-  if (protocol === 'trojan') return parseTrojan(link)
-  if (protocol === 'ss') return parseShadowsocks(link)
-  if (protocol === 'ssr') return parseShadowsocksR(link)
-  if (protocol === 'socks' || protocol === 'socks5') return parseSocks(link)
-  if (protocol === 'hysteria') return parseHysteria(link)
-  if (protocol === 'hysteria2' || protocol === 'hy2') return parseHysteria2(link)
-  if (protocol === 'tuic') return parseTuic(link)
-  if (protocol === 'wireguard') return parseWireGuard(link)
-  return null
-}
 
-function parseVmess(link) {
-  const raw = link.replace(/^vmess:\/\//i, '').trim()
-  const decoded = tryBase64Decode(raw)
-  if (!decoded) throw new Error('VMess payload is not valid base64')
 
-  let data
-  try {
-    data = JSON.parse(decoded)
-  } catch {
-    throw new Error('VMess payload is not valid JSON')
-  }
 
-  const proxy = compact({
-    name: cleanName(data.ps || data.add || 'vmess'),
-    type: 'vmess',
-    server: required(data.add, 'server'),
-    port: toPort(data.port),
-    uuid: required(data.id, 'uuid'),
-    alterId: Number(data.aid || 0),
-    cipher: data.scy || 'auto',
-    tls: data.tls === 'tls',
-    servername: data.sni || (data.host && !data.host.includes(',') ? data.host : undefined),
-    network: normalizeTransport(data.net),
-  })
 
-  applyTransport(proxy, {
-    type: data.net,
-    host: data.host,
-    path: data.path,
-    serviceName: data.path,
-  })
 
-  finalizeProxyTransport(proxy)
-  return proxy
-}
 
-function parseVless(link) {
-  const url = toUrl(link)
-  const params = url.searchParams
-  const proxy = compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'vless'),
-    type: 'vless',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port || defaultPort('vless', params)),
-    uuid: required(url.username, 'uuid'),
-    flow: params.get('flow') || undefined,
-    tls: params.get('security') === 'tls' || params.get('security') === 'reality',
-    servername: params.get('sni') || params.get('peer') || undefined,
-    alpn: params.get('alpn')?.split(',') || undefined,
-    encryption: params.has('encryption') ? params.get('encryption') : undefined,
-    'client-fingerprint': params.get('fp') || undefined,
-    'skip-cert-verify': boolParam(params.get('allowInsecure')),
-    network: normalizeTransport(params.get('type')),
-  })
 
-  if (params.get('security') === 'reality') {
-    proxy.reality = true
-    proxy['reality-opts'] = compact({
-      'public-key': params.get('pbk') || undefined,
-      'short-id': params.get('sid') || undefined,
-      'spider-x': params.get('spx') ? decodeText(params.get('spx')) : undefined,
-    })
-  }
-
-  applyTransport(proxy, {
-    type: params.get('type'),
-    host: params.get('host'),
-    path: params.get('path'),
-    serviceName: params.get('serviceName'),
-    mode: params.get('mode'),
-    method: params.get('method'),
-    extra: params,
-  })
-
-  finalizeProxyTransport(proxy)
-  return proxy
-}
-
-function parseTrojan(link) {
-  const url = toUrl(link)
-  const params = url.searchParams
-  const proxy = compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'trojan'),
-    type: 'trojan',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port || defaultPort('trojan', params)),
-    password: required(decodeText(url.username), 'password'),
-    sni: params.get('sni') || params.get('peer') || undefined,
-    alpn: params.get('alpn')?.split(',') || undefined,
-    'skip-cert-verify': boolParam(params.get('allowInsecure')),
-    network: normalizeTransport(params.get('type')),
-  })
-
-  applyTransport(proxy, {
-    type: params.get('type'),
-    host: params.get('host'),
-    path: params.get('path'),
-    serviceName: params.get('serviceName'),
-    mode: params.get('mode'),
-    method: params.get('method'),
-    extra: params,
-  })
-
-  finalizeProxyTransport(proxy)
-  return proxy
-}
-
-function parseShadowsocks(link) {
-  const raw = link.replace(/^ss:\/\//i, '')
-  const [withoutHash, hash = ''] = raw.split('#')
-  const name = cleanName(hash || 'ss')
-  const [mainPart, queryPart = ''] = withoutHash.split('?')
-
-  const decodedMain = tryBase64Decode(decodeText(mainPart))
-  const candidate = decodedMain && decodedMain.includes('@') ? decodedMain : mainPart
-  const url = toUrl(`ss://${candidate}${queryPart ? `?${queryPart}` : ''}`)
-  const params = url.searchParams
-
-  let cipher = decodeText(url.username)
-  let password = decodeText(url.password)
-
-  if (!password) {
-    const userInfo = tryBase64Decode(decodeText(url.username))
-    if (userInfo && userInfo.includes(':')) {
-      const splitAt = userInfo.indexOf(':')
-      cipher = userInfo.slice(0, splitAt)
-      password = userInfo.slice(splitAt + 1)
-    }
-  }
-
-  const proxy = compact({
-    name,
-    type: 'ss',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port || 8388),
-    cipher: required(cipher, 'cipher'),
-    password: required(password, 'password'),
-    udp: true,
-  })
-
-  const pluginStr = params.get('plugin')
-  if (pluginStr) {
-    const parts = decodeText(pluginStr).split(';')
-    proxy.plugin = parts[0]
-    const opts = {}
-    for (let i = 1; i < parts.length; i++) {
-      const [key, ...valueParts] = parts[i].split('=')
-      if (key) {
-        opts[key] = valueParts.length ? decodeText(valueParts.join('=')) : true
-      }
-    }
-    proxy['plugin-opts'] = opts
-  }
-
-  return proxy
-}
-
-function parseShadowsocksR(link) {
-  const payload = tryBase64Decode(link.replace(/^ssr:\/\//i, ''))
-  if (!payload) throw new Error('SSR payload is not valid base64')
-
-  const [main, rawParams = ''] = payload.split('/?')
-  const parts = main.split(':')
-  if (parts.length < 6) throw new Error('SSR format is incomplete')
-
-  const server = parts.slice(0, parts.length - 5).join(':')
-  const port = parts[parts.length - 5]
-  const protocol = parts[parts.length - 4]
-  const cipher = parts[parts.length - 3]
-  const obfs = parts[parts.length - 2]
-  const passwordB64 = parts[parts.length - 1]
-
-  const params = new URLSearchParams(rawParams)
-  return compact({
-    name: cleanName(base64Param(params, 'remarks') || server || 'ssr'),
-    type: 'ssr',
-    server: required(server.replace(/^\[|\]$/g, ''), 'server'),
-    port: toPort(port),
-    cipher: required(cipher, 'cipher'),
-    password: required(tryBase64Decode(passwordB64), 'password'),
-    protocol: required(protocol, 'protocol'),
-    obfs: required(obfs, 'obfs'),
-    'protocol-param': base64Param(params, 'protoparam') || undefined,
-    'obfs-param': base64Param(params, 'obfsparam') || undefined,
-  })
-}
-
-function parseSocks(link) {
-  const url = toUrl(link.replace(/^socks:\/\//i, 'socks5://'))
-  const params = url.searchParams
-
-  return compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'socks5'),
-    type: 'socks5',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port || 1080),
-    username: url.username ? decodeText(url.username) : undefined,
-    password: url.password ? decodeText(url.password) : undefined,
-    udp: boolParam(params.get('udp')),
-    tls: boolParam(params.get('tls')),
-    sni: params.get('sni') || undefined,
-    'skip-cert-verify': boolParam(params.get('allowInsecure') || params.get('insecure')),
-  })
-}
-
-function parseHysteria(link) {
-  const url = toUrl(link)
-  const params = url.searchParams
-
-  return compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'hysteria'),
-    type: 'hysteria',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port),
-    'auth-str': required(decodeText(url.username || params.get('auth-str') || params.get('auth_str') || params.get('auth') || ''), 'auth-str'),
-    alpn: params.get('alpn')?.split(',') || undefined,
-    protocol: params.get('protocol') || undefined,
-    up: params.get('up') || undefined,
-    down: params.get('down') || undefined,
-    sni: params.get('sni') || undefined,
-    'skip-cert-verify': boolParam(params.get('allowInsecure') || params.get('insecure')),
-    obfs: params.get('obfs') || undefined,
-    'obfs-password': params.get('obfs-password') || params.get('obfsPassword') || undefined,
-  })
-}
-
-function parseHysteria2(link) {
-  const url = toUrl(link.replace(/^hy2:\/\//i, 'hysteria2://'))
-  const params = url.searchParams
-
-  return compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'hysteria2'),
-    type: 'hysteria2',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port),
-    password: required(decodeText(url.username), 'password'),
-    up: params.get('up') || undefined,
-    down: params.get('down') || undefined,
-    sni: params.get('sni') || undefined,
-    'skip-cert-verify': boolParam(params.get('insecure')),
-    obfs: params.get('obfs') || undefined,
-    'obfs-password': params.get('obfs-password') || params.get('obfsPassword') || undefined,
-  })
-}
-
-function parseTuic(link) {
-  const url = toUrl(link)
-  const params = url.searchParams
-
-  return compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'tuic'),
-    type: 'tuic',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port),
-    uuid: required(decodeText(url.username), 'uuid'),
-    password: required(decodeText(url.password), 'password'),
-    sni: params.get('sni') || undefined,
-    alpn: params.get('alpn')?.split(',') || undefined,
-    'skip-cert-verify': boolParam(params.get('allow_insecure') || params.get('insecure')),
-    'congestion-controller': params.get('congestion_control') || params.get('congestion-controller') || undefined,
-    udp: true,
-  })
-}
-
-function parseWireGuard(link) {
-  const url = toUrl(link)
-  const params = url.searchParams
-
-  return compact({
-    name: cleanName(url.hash ? decodeText(url.hash.slice(1)) : url.hostname || 'wireguard'),
-    type: 'wireguard',
-    server: required(url.hostname, 'server'),
-    port: toPort(url.port || 51820),
-    ip: params.get('address') || undefined,
-    ipv6: params.get('ipv6') || params.get('address6') || undefined,
-    'private-key': required(decodeText(url.username), 'private-key'),
-    'public-key': required(params.get('publickey'), 'public-key'),
-    'pre-shared-key': params.get('presharedkey') || undefined,
-    reserved: parseReserved(params.get('reserved')),
-    mtu: numberParam(params.get('mtu')),
-    'persistent-keepalive': numberParam(params.get('keepalive') || params.get('persistent-keepalive')),
-    'remote-dns-resolve': boolParam(params.get('remote-dns-resolve')),
-    dns: params.get('dns')?.split(',').map((s) => s.trim()).filter(Boolean) || undefined,
-    udp: true,
-    peers: [{
-      server: url.hostname,
-      port: toPort(url.port || 51820),
-      'public-key': params.get('publickey'),
-      'pre-shared-key': params.get('presharedkey') || undefined,
-      reserved: parseReserved(params.get('reserved')),
-      'allowed-ips': params.get('allowedips')?.split(',') || undefined,
-    }]
-  })
-}
-
-function applyTransport(proxy, options) {
-  const type = String(options.type || '').toLowerCase()
-
-  if (type === 'ws') {
-    proxy.network = 'ws'
-    proxy['ws-opts'] = compact({
-      path: options.path ? decodeText(options.path) : '/',
-      headers: options.host ? { Host: decodeText(options.host) } : undefined,
-      'max-early-data': numberParam(options.extra?.get('ed') || options.extra?.get('max-early-data')),
-      'early-data-header-name': options.extra?.get('eh') || options.extra?.get('early-data-header-name') || undefined,
-      'v2ray-http-upgrade': boolParam(options.extra?.get('v2ray-http-upgrade')),
-      'v2ray-http-upgrade-fast-open': boolParam(options.extra?.get('v2ray-http-upgrade-fast-open')),
-    })
-  }
-
-  if (type === 'grpc') {
-    proxy.network = 'grpc'
-    proxy['grpc-opts'] = compact({
-      'grpc-service-name': options.serviceName ? decodeText(options.serviceName) : undefined,
-      'grpc-user-agent': options.extra?.get('grpc-user-agent') || undefined,
-      'ping-interval': numberParam(options.extra?.get('ping-interval')),
-      'max-connections': numberParam(options.extra?.get('max-connections')),
-      'min-streams': numberParam(options.extra?.get('min-streams')),
-      'max-streams': numberParam(options.extra?.get('max-streams')),
-    })
-  }
-
-  if (type === 'h2') {
-    proxy.network = 'h2'
-    proxy['h2-opts'] = compact({
-      host: normalizeList(options.host, []),
-      path: options.path ? decodeText(options.path) : undefined,
-    })
-  }
-
-  if (type === 'http') {
-    proxy.network = 'http'
-    proxy['http-opts'] = compact({
-      method: options.method || undefined,
-      path: options.path ? normalizeList(decodeText(options.path), []) : undefined,
-      headers: options.host ? { Host: normalizeList(decodeText(options.host), []) } : undefined,
-    })
-  }
-
-  if (type === 'xhttp') {
-    proxy.network = type
-    proxy['xhttp-opts'] = compact({
-      path: options.path ? decodeText(options.path) : '/',
-      host: options.host ? decodeText(options.host) : undefined,
-      mode: options.mode || undefined,
-      'no-grpc-header': boolParam(options.extra?.get('no-grpc-header')),
-      'x-padding-bytes': options.extra?.get('x-padding-bytes') || undefined,
-      'x-padding-obfs-mode': boolParam(options.extra?.get('x-padding-obfs-mode')),
-      'x-padding-key': options.extra?.get('x-padding-key') || undefined,
-      'x-padding-header': options.extra?.get('x-padding-header') || undefined,
-      'x-padding-placement': options.extra?.get('x-padding-placement') || undefined,
-      'x-padding-method': options.extra?.get('x-padding-method') || undefined,
-      'uplink-http-method': options.extra?.get('uplink-http-method') || undefined,
-      'session-placement': options.extra?.get('session-placement') || undefined,
-      'session-key': options.extra?.get('session-key') || undefined,
-      'seq-placement': options.extra?.get('seq-placement') || undefined,
-      'seq-key': options.extra?.get('seq-key') || undefined,
-      'uplink-data-placement': options.extra?.get('uplink-data-placement') || undefined,
-      'uplink-data-key': options.extra?.get('uplink-data-key') || undefined,
-      'uplink-chunk-size': numberParam(options.extra?.get('uplink-chunk-size')),
-      'sc-max-each-post-bytes': numberParam(options.extra?.get('sc-max-each-post-bytes')),
-      'sc-min-posts-interval-ms': numberParam(options.extra?.get('sc-min-posts-interval-ms')),
-    })
-  }
-}
 
 function buildRules(rulesPreset) {
   if (rulesPreset === 'lan-direct') {
@@ -1533,48 +1113,12 @@ function spaceTopLevelSections(yaml) {
   return spaced.join('\n')
 }
 
-function formatKey(key) {
-  if (/^[a-zA-Z0-9_-]+$/.test(key)) return key
-  return JSON.stringify(key)
-}
 
-function formatScalar(value, indent = 0) {
-  if (value === null) return 'null'
-  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'null'
-  if (typeof value === 'boolean') return String(value)
-  const str = String(value)
-  if (str.includes('\n')) {
-    const scalarPad = ' '.repeat(indent + 2)
-    return '|\n' + str.split(/\r?\n/).map(line => scalarPad + line).join('\n')
-  }
-  return JSON.stringify(str)
-}
 
-function isScalar(value) {
-  return value === null || ['string', 'number', 'boolean'].includes(typeof value)
-}
 
-function isEmptyProxyField(value) {
-  if (value === undefined || value === null) return true
-  if (typeof value === 'string' && value.trim() === '') return true
-  if (Array.isArray(value) && value.length === 0) return true
-  return false
-}
 
-function missingProxyProviderPayloadFields(proxy) {
-  if (!isPlainObject(proxy)) return ['name', 'type']
-  const type = String(proxy.type || '').toLowerCase()
-  const requiredFields = ['name', 'type', ...(REQUIRED_PROXY_FIELDS[type] || ['server', 'port'])]
-  return requiredFields.filter((field) => isEmptyProxyField(proxy[field]))
-}
 
-function isValidProxyProviderPayloadProxy(proxy) {
-  return isPlainObject(proxy) && !hasRuleSeparator(proxy.name) && missingProxyProviderPayloadFields(proxy).length === 0
-}
 
-function hasRuleSeparator(value) {
-  return String(value || '').includes(',')
-}
 
 function makeUniqueNames(proxies) {
   const assigned = new Set()
@@ -2035,39 +1579,10 @@ const ntpFieldKeys = [
   'interval',
 ]
 
-function normalizeObject(value: ProxyNode = {}) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return { ...value }
-}
 
-function normalizeBooleanValue(value, fallback = false) {
-  if (value === undefined || value === null || value === '') return fallback
-  if (value === true || value === false) return value
-  const normalized = String(value).trim().toLowerCase()
-  if (['true', '1', 'yes', 'on'].includes(normalized)) return true
-  if (['false', '0', 'no', 'off'].includes(normalized)) return false
-  return Boolean(value)
-}
 
-function isTruthyBooleanValue(value) {
-  if (value === true) return true
-  if (typeof value === 'string') return ['true', '1', 'yes', 'on'].includes(value.trim().toLowerCase())
-  return false
-}
 
-function normalizeProxyModelNode(proxy: ProxyNode = {}) {
-  const normalized = { ...proxy }
-  normalized.name = String(normalized.name || '').trim()
-  normalized.type = String(normalized.type || '').trim().toLowerCase()
-  if (normalized.enabled !== undefined) normalized.enabled = normalizeBooleanValue(normalized.enabled, true)
-  if (normalized['dialer-proxy'] !== undefined) normalized['dialer-proxy'] = String(normalized['dialer-proxy'] || '').trim()
-  if (normalized.network !== undefined) normalized.network = String(normalized.network || '').trim().toLowerCase()
-  return normalized
-}
 
-function isPlainObject(value) {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
-}
 
 function normalizeRawSections(value: ProxyNode = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
@@ -2285,10 +1800,6 @@ const tunnelFieldKeys = [
   'proxy',
 ]
 
-function omitKeys(value: ProxyNode = {}, keys: string[]) {
-  const omitted = new Set(keys)
-  return Object.fromEntries(Object.entries(value).filter(([key]) => !omitted.has(key)))
-}
 
 function normalizeSubRules(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
@@ -2299,44 +1810,10 @@ function normalizeSubRules(value = {}) {
   )
 }
 
-function normalizeList(value, fallback) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
-  if (typeof value === 'string') return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean)
-  return fallback
-}
 
-function normalizeLineList(value, fallback) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
-  if (typeof value === 'string') return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)
-  return fallback
-}
 
-function normalizeRuleList(value, fallback) {
-  return normalizeLineList(value, fallback).map(normalizeRuleLine).filter(Boolean)
-}
 
-function normalizeRuleLine(rule) {
-  return splitRuleParts(rule).filter((part) => part !== '').join(',')
-}
 
-function splitRuleParts(rule) {
-  const parts: string[] = []
-  let current = ''
-  let depth = 0
-  for (const char of String(rule)) {
-    if (char === '(') depth += 1
-    else if (char === ')' && depth > 0) depth -= 1
-
-    if (char === ',' && depth === 0) {
-      parts.push(current.trim())
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  parts.push(current.trim())
-  return parts
-}
 
 function groupReferenceCreatesCycle(sourceName, targetName, groups) {
   if (!sourceName || !targetName) return false
@@ -2502,166 +1979,4 @@ function cleanupUnsupportedTlsOptions(proxy) {
   if (!fields.has('private-key') && !PROXY_PRIVATE_KEY_TYPES.has(type)) delete proxy['private-key']
   if (!fields.has('reality')) delete proxy['reality-opts']
   if (!fields.has('ech')) delete proxy['ech-opts']
-}
-
-function finalizeProxyTransport(proxy) {
-  if (proxy.network && !isTransportSupportedByProxy(proxy, proxy.network)) {
-    delete proxy.network
-    cleanupProxyTransportOptions(proxy)
-    return proxy
-  }
-
-  if (proxy.network === 'xhttp') applyXhttpDefaults(proxy)
-  return proxy
-}
-
-function isTransportSupportedByProxy(proxy, network) {
-  if (!network) return true
-  const proxyType = String(proxy.type || '').toLowerCase()
-  const supported = TRANSPORT_TYPES_BY_PROXY[proxyType]
-  return Array.isArray(supported) ? supported.includes(network) : false
-}
-
-function cleanupProxyTransportOptions(proxy) {
-  delete proxy['ws-opts']
-  delete proxy['grpc-opts']
-  delete proxy['h2-opts']
-  delete proxy['http-opts']
-  delete proxy['httpupgrade-opts']
-  delete proxy['xhttp-opts']
-}
-
-function applyXhttpDefaults(proxy) {
-  if (!Array.isArray(proxy.alpn) || !proxy.alpn.length) proxy.alpn = ['h2']
-  if (proxy.encryption === undefined) proxy.encryption = ''
-  proxy['xhttp-opts'] = {
-    path: '/',
-    ...(proxy['xhttp-opts'] || {}),
-    'no-grpc-header': booleanValue(proxy['xhttp-opts']?.['no-grpc-header']),
-    'x-padding-obfs-mode': booleanValue(proxy['xhttp-opts']?.['x-padding-obfs-mode']),
-  }
-}
-
-function booleanValue(value) {
-  if (value === true || value === false) return value
-  return ['1', 'true', 'yes'].includes(String(value || '').toLowerCase())
-}
-
-function normalizeTransport(value) {
-  const transport = String(value || '').toLowerCase()
-  if (!transport || transport === 'tcp') return undefined
-  return TRANSPORT_TYPES.includes(transport) ? transport : undefined
-}
-
-function makeUniqueProviderNames(providers, basePath = './rules') {
-  const seen = new Map()
-  for (const provider of providers) {
-    if (!provider.name) continue
-    const base = provider.name
-    const count = seen.get(base) || 0
-    seen.set(base, count + 1)
-    provider.name = count === 0 ? base : `${base}-${count + 1}`
-    if (!provider.path) provider.path = `${basePath}/${provider.name}.yaml`
-  }
-}
-
-function compact(object) {
-  return Object.fromEntries(
-    Object.entries(object).filter(([, value]) => {
-      if (value === undefined || value === null || value === '') return false
-      if (typeof value === 'number' && Number.isNaN(value)) return false
-      if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) return false
-      return true
-    }),
-  )
-}
-
-function defaultPort(protocol, params) {
-  if (protocol === 'trojan') return 443
-  return params.get('security') === 'tls' || params.get('security') === 'reality' ? 443 : 80
-}
-
-function defaultProxyPort(protocol) {
-  if (protocol === 'ss' || protocol === 'ssr') return 8388
-  return 443
-}
-
-function getProtocol(line) {
-  const match = String(line || '').match(/^([a-z0-9+.-]+):\/\//i)
-  return match ? match[1].toLowerCase() : ''
-}
-
-function snippet(value) {
-  const text = String(value || '').trim()
-  const redacted = text.replace(/^((?:wireguard|trojan|hy2|hysteria2|tuic):\/\/)[^@]+@/i, '$1***@')
-  return redacted.length > 96 ? `${redacted.slice(0, 96)}...` : redacted
-}
-
-function required(value, field) {
-  if (value === undefined || value === null || value === '') throw new Error(`${field} is required`)
-  return value
-}
-
-function toPort(value) {
-  const port = Number(value)
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('port is invalid')
-  return port
-}
-
-function toUrl(link) {
-  try {
-    return new URL(link)
-  } catch {
-    throw new Error('URL is invalid')
-  }
-}
-
-function boolParam(value) {
-  if (value === null || value === undefined || value === '') return undefined
-  return ['1', 'true', 'yes'].includes(String(value).toLowerCase())
-}
-
-function numberParam(value) {
-  if (value === null || value === undefined || value === '') return undefined
-  const number = Number(value)
-  return Number.isFinite(number) ? number : undefined
-}
-
-function parseReserved(value) {
-  if (!value) return undefined
-  const parts = value.split(',').map((s) => s.trim())
-  if (parts.every((p) => /^\d+$/.test(p))) return parts.map(Number)
-  return value
-}
-
-function cleanName(value) {
-  const decoded = decodeText(String(value || '')).trim()
-  return decoded || 'proxy'
-}
-
-function decodeText(value) {
-  try {
-    return decodeURIComponent(String(value).replace(/\+/g, '%20'))
-  } catch {
-    return String(value)
-  }
-}
-
-function base64Param(params, key) {
-  const value = params.get(key)
-  return value ? tryBase64Decode(value) : undefined
-}
-
-function tryBase64Decode(value) {
-  const raw = String(value || '').trim()
-  if (!raw) return ''
-  try {
-    const normalized = raw.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    const binary = atob(padded)
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
-    return new TextDecoder().decode(bytes).trim()
-  } catch {
-    return ''
-  }
 }
