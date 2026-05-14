@@ -11,7 +11,6 @@ import {
   options,
   randomSecret,
   readConvertOptions,
-  SUBSCRIPTION_EXPIRY,
   SUBSCRIPTION_RATE_LIMIT,
   subscriptionHeaders,
 } from './http.js'
@@ -97,29 +96,24 @@ async function handleCreateSubscription(request, env) {
     return json({ error: 'YAML is too large. Maximum size is 256 KB.' }, 413, 'POST,OPTIONS', request, env)
   }
 
-  const expiresIn = Object.hasOwn(SUBSCRIPTION_EXPIRY, payload.expiresIn) ? payload.expiresIn : 'never'
   const filename = normalizeSubscriptionFilename(payload.filename)
   const secret = randomSecret(32)
   const record = JSON.stringify({
     yaml,
     createdAt: new Date().toISOString(),
-    expiresIn,
     ip: clientIp(request),
   })
-  const ttl = SUBSCRIPTION_EXPIRY[expiresIn]
-  const writeOptions = ttl ? { expirationTtl: ttl } : undefined
-  await env.SUBSCRIPTIONS.put(`sub:${secret}`, record, writeOptions)
+  await env.SUBSCRIPTIONS.put(`sub:${secret}`, record)
 
   const ip = clientIp(request)
   const indexKey = `idx:${ip}`
   const existing = JSON.parse(await env.SUBSCRIPTIONS.get(indexKey) || '[]')
-  existing.push({ secret, createdAt: new Date().toISOString(), expiresIn })
+  existing.push({ secret, createdAt: new Date().toISOString() })
   await env.SUBSCRIPTIONS.put(indexKey, JSON.stringify(existing))
 
   return json({
     ok: true,
     url: new URL(`/sub/${secret}/${filename}`, request.url).toString(),
-    expiresIn,
   }, 200, 'POST,OPTIONS', request, env)
 }
 
@@ -160,7 +154,7 @@ async function handleListSubscriptions(request, env) {
         secret: entry.secret,
         url: new URL(`/sub/${entry.secret}/config.yaml`, request.url).toString(),
         createdAt: entry.createdAt,
-        expiresIn: entry.expiresIn,
+
       })
     }
   }

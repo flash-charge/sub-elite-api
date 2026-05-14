@@ -5,8 +5,6 @@ export const SUBSCRIPTION_RATE_LIMIT = {
   windowSeconds: 60,
 }
 export const SUBSCRIPTION_EXPIRY = {
-  '7d': 7 * 24 * 60 * 60,
-  '30d': 30 * 24 * 60 * 60,
   never: undefined,
 }
 
