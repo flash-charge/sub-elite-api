@@ -26,6 +26,10 @@ export default {
       if (pathname === '/healthz' && request.method === 'GET') return json({ ok: true }, 200, 'GET,OPTIONS', request, env)
       if (pathname === '/api/convert' && request.method === 'POST') return handleConvert(request, env)
       if (pathname === '/api/subscriptions' && request.method === 'POST') return handleCreateSubscription(request, env)
+      if (pathname === '/api/subscriptions' && request.method === 'GET') return handleListSubscriptions(request, env)
+      if (/^\/api\/subscriptions\/[A-Za-z0-9_-]+$/u.test(pathname) && request.method === 'DELETE') {
+        return handleDeleteSubscription(pathname, request, env)
+      }
       if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname) && request.method === 'GET') {
         return handleSubscription(pathname, env, request)
       }
@@ -39,7 +43,9 @@ export default {
 
 function handleOptions(pathname, request, env) {
   if (pathname === '/healthz') return options('GET,OPTIONS', request, env)
-  if (pathname === '/api/convert' || pathname === '/api/subscriptions') return options('POST,OPTIONS', request, env)
+  if (pathname === '/api/convert') return options('POST,OPTIONS', request, env)
+  if (pathname === '/api/subscriptions') return options('GET,POST,OPTIONS', request, env)
+  if (/^\/api\/subscriptions\/[A-Za-z0-9_-]+$/u.test(pathname)) return options('DELETE,OPTIONS', request, env)
   if (/^\/sub\/[A-Za-z0-9_-]+\/config\.yaml$/u.test(pathname)) {
     return new Response(null, { status: isAllowedOrigin(request, env) ? 204 : 403, headers: subscriptionHeaders(request, env) })
   }
@@ -97,10 +103,17 @@ async function handleCreateSubscription(request, env) {
     yaml,
     createdAt: new Date().toISOString(),
     expiresIn,
+    ip: clientIp(request),
   })
   const ttl = SUBSCRIPTION_EXPIRY[expiresIn]
   const writeOptions = ttl ? { expirationTtl: ttl } : undefined
   await env.SUBSCRIPTIONS.put(`sub:${secret}`, record, writeOptions)
+
+  const ip = clientIp(request)
+  const indexKey = `idx:${ip}`
+  const existing = JSON.parse(await env.SUBSCRIPTIONS.get(indexKey) || '[]')
+  existing.push({ secret, createdAt: new Date().toISOString(), expiresIn })
+  await env.SUBSCRIPTIONS.put(indexKey, JSON.stringify(existing))
 
   return json({
     ok: true,
@@ -128,6 +141,58 @@ async function checkSubscriptionRateLimit(request, env) {
     expirationTtl: SUBSCRIPTION_RATE_LIMIT.windowSeconds * 2,
   })
   return null
+}
+
+async function handleListSubscriptions(request, env) {
+  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'GET,OPTIONS', request, env)
+  if (!env.SUBSCRIPTIONS) return json({ error: 'KV binding SUBSCRIPTIONS is not available.' }, 500, 'GET,OPTIONS', request, env)
+
+  const ip = clientIp(request)
+  const indexKey = `idx:${ip}`
+  const entries = JSON.parse(await env.SUBSCRIPTIONS.get(indexKey) || '[]')
+
+  const items = []
+  for (const entry of entries) {
+    const record = await env.SUBSCRIPTIONS.get(`sub:${entry.secret}`)
+    if (record) {
+      items.push({
+        secret: entry.secret,
+        url: new URL(`/sub/${entry.secret}/config.yaml`, request.url).toString(),
+        createdAt: entry.createdAt,
+        expiresIn: entry.expiresIn,
+      })
+    }
+  }
+
+  if (items.length !== entries.length) {
+    await env.SUBSCRIPTIONS.put(indexKey, JSON.stringify(entries.filter((e) => items.some((i) => i.secret === e.secret))))
+  }
+
+  return json({ ok: true, subscriptions: items }, 200, 'GET,OPTIONS', request, env)
+}
+
+async function handleDeleteSubscription(pathname, request, env) {
+  if (!isTrustedApiRequest(request, env)) return json({ error: 'Request is not allowed.' }, 403, 'DELETE,OPTIONS', request, env)
+  if (!env.SUBSCRIPTIONS) return json({ error: 'KV binding SUBSCRIPTIONS is not available.' }, 500, 'DELETE,OPTIONS', request, env)
+
+  const secret = pathname.split('/')[3]
+  const record = await env.SUBSCRIPTIONS.get(`sub:${secret}`)
+  if (!record) return json({ error: 'Subscription not found.' }, 404, 'DELETE,OPTIONS', request, env)
+
+  let storedIp = ''
+  try { storedIp = JSON.parse(record).ip || '' } catch { /* ignore */ }
+  const requestIp = clientIp(request)
+  if (storedIp && storedIp !== requestIp) return json({ error: 'Not authorized to delete this subscription.' }, 403, 'DELETE,OPTIONS', request, env)
+
+  await env.SUBSCRIPTIONS.delete(`sub:${secret}`)
+
+  const indexKey = `idx:${requestIp}`
+  const entries = JSON.parse(await env.SUBSCRIPTIONS.get(indexKey) || '[]')
+  const filtered = entries.filter((e) => e.secret !== secret)
+  if (filtered.length) await env.SUBSCRIPTIONS.put(indexKey, JSON.stringify(filtered))
+  else await env.SUBSCRIPTIONS.delete(indexKey)
+
+  return json({ ok: true }, 200, 'DELETE,OPTIONS', request, env)
 }
 
 async function handleSubscription(pathname, env, request) {
