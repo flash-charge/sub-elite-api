@@ -55,10 +55,16 @@ export function byteLength(value) {
 }
 
 export function randomSecret(length) {
-  const bytes = new Uint8Array(length)
-  crypto.getRandomValues(bytes)
+  const limit = 256 - (256 % SECRET_ALPHABET.length)
   let output = ''
-  for (const byte of bytes) output += SECRET_ALPHABET[byte % SECRET_ALPHABET.length]
+  while (output.length < length) {
+    const bytes = new Uint8Array(length - output.length)
+    crypto.getRandomValues(bytes)
+    for (const byte of bytes) {
+      if (byte < limit) output += SECRET_ALPHABET[byte % SECRET_ALPHABET.length]
+      if (output.length === length) break
+    }
+  }
   return output
 }
 

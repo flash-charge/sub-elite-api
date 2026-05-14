@@ -110,10 +110,18 @@ async function handleCreateSubscription(request, env) {
 }
 
 async function checkSubscriptionRateLimit(request, env) {
-  const bucket = Math.floor(Date.now() / (SUBSCRIPTION_RATE_LIMIT.windowSeconds * 1000))
-  const key = `rate:subscriptions:${bucket}:${clientIp(request)}`
-  const current = Number(await env.SUBSCRIPTIONS.get(key) || 0)
-  if (current >= SUBSCRIPTION_RATE_LIMIT.max) {
+  const now = Date.now()
+  const bucket = Math.floor(now / (SUBSCRIPTION_RATE_LIMIT.windowSeconds * 1000))
+  const ip = clientIp(request)
+  const key = `rate:subscriptions:${bucket}:${ip}`
+  const prevKey = `rate:subscriptions:${bucket - 1}:${ip}`
+  const [current, prev] = await Promise.all([
+    env.SUBSCRIPTIONS.get(key).then((v) => Number(v || 0)),
+    env.SUBSCRIPTIONS.get(prevKey).then((v) => Number(v || 0)),
+  ])
+  const elapsed = (now % (SUBSCRIPTION_RATE_LIMIT.windowSeconds * 1000)) / (SUBSCRIPTION_RATE_LIMIT.windowSeconds * 1000)
+  const weighted = Math.floor(prev * (1 - elapsed)) + current
+  if (weighted >= SUBSCRIPTION_RATE_LIMIT.max) {
     return json({ error: 'Too many subscription requests. Try again later.' }, 429, 'POST,OPTIONS', request, env)
   }
   await env.SUBSCRIPTIONS.put(key, String(current + 1), {
