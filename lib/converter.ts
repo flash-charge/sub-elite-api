@@ -694,16 +694,22 @@ function parseWireGuard(link) {
     server: required(url.hostname, 'server'),
     port: toPort(url.port || 51820),
     ip: params.get('address') || undefined,
+    ipv6: params.get('ipv6') || params.get('address6') || undefined,
     'private-key': required(decodeText(url.username), 'private-key'),
     'public-key': required(params.get('publickey'), 'public-key'),
     'pre-shared-key': params.get('presharedkey') || undefined,
+    reserved: parseReserved(params.get('reserved')),
     mtu: numberParam(params.get('mtu')),
+    'persistent-keepalive': numberParam(params.get('keepalive') || params.get('persistent-keepalive')),
+    'remote-dns-resolve': boolParam(params.get('remote-dns-resolve')),
+    dns: params.get('dns')?.split(',').map((s) => s.trim()).filter(Boolean) || undefined,
     udp: true,
     peers: [{
       server: url.hostname,
       port: toPort(url.port || 51820),
       'public-key': params.get('publickey'),
       'pre-shared-key': params.get('presharedkey') || undefined,
+      reserved: parseReserved(params.get('reserved')),
       'allowed-ips': params.get('allowedips')?.split(',') || undefined,
     }]
   })
@@ -921,6 +927,7 @@ function createNtp() {
 function createGeo() {
   return {
     geodataMode: false,
+    geodataLoader: '',
     geoAutoUpdate: false,
     geoUpdateInterval: 24,
     geoxUrl: {
@@ -986,6 +993,7 @@ function buildProfile(profile) {
 function buildGeo(geo) {
   return compact({
     'geodata-mode': geo.geodataMode,
+    'geodata-loader': geo.geodataLoader || undefined,
     'geo-auto-update': geo.geoAutoUpdate,
     'geo-update-interval': geo.geoUpdateInterval,
     'geox-url': geo.geodataMode || geo.geoAutoUpdate ? geo.geoxUrl : undefined,
@@ -1587,6 +1595,7 @@ function normalizeGeo(geo: ProxyNode = {}) {
     ...createGeo(),
     ...geo,
     geodataMode: Boolean(geo.geodataMode ?? geo['geodata-mode'] ?? createGeo().geodataMode),
+    geodataLoader: ['standard', 'memconservative'].includes(geo.geodataLoader || geo['geodata-loader']) ? (geo.geodataLoader || geo['geodata-loader']) : '',
     geoAutoUpdate: Boolean(geo.geoAutoUpdate ?? geo['geo-auto-update'] ?? createGeo().geoAutoUpdate),
     geoUpdateInterval: Number(geo.geoUpdateInterval || geo['geo-update-interval']) || 24,
     geoxUrl: {
@@ -1872,6 +1881,13 @@ function numberParam(value) {
   if (value === null || value === undefined || value === '') return undefined
   const number = Number(value)
   return Number.isFinite(number) ? number : undefined
+}
+
+function parseReserved(value) {
+  if (!value) return undefined
+  const parts = value.split(',').map((s) => s.trim())
+  if (parts.every((p) => /^\d+$/.test(p))) return parts.map(Number)
+  return value
 }
 
 function cleanName(value) {
