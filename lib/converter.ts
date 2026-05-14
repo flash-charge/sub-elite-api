@@ -86,7 +86,7 @@ export function convertToClashMeta(input: string, options: any = {}) {
 }
 
 export const outputTemplates = ['full', 'proxies', 'provider']
-export const rulesPresets = ['proxy', 'lan-direct', 'direct']
+export const rulesPresets = ['proxy', 'lan-direct', 'indonesia-direct', 'privacy', 'direct']
 export const groupTypes = ['select', 'url-test', 'fallback', 'load-balance', 'relay']
 
 export function createConfigModel(proxies: ProxyNode[], options: any = {}) {
@@ -794,6 +794,29 @@ function buildRules(rulesPreset) {
       'IP-CIDR,192.168.0.0/16,DIRECT',
       'IP-CIDR,127.0.0.0/8,DIRECT',
       'IP-CIDR,169.254.0.0/16,DIRECT',
+      'MATCH,PROXY',
+    ]
+  }
+
+  if (rulesPreset === 'indonesia-direct') {
+    return [
+      'IP-CIDR,10.0.0.0/8,DIRECT',
+      'IP-CIDR,172.16.0.0/12,DIRECT',
+      'IP-CIDR,192.168.0.0/16,DIRECT',
+      'IP-CIDR,127.0.0.0/8,DIRECT',
+      'GEOSITE,category-id,DIRECT',
+      'GEOIP,ID,DIRECT',
+      'MATCH,PROXY',
+    ]
+  }
+
+  if (rulesPreset === 'privacy') {
+    return [
+      'IP-CIDR,10.0.0.0/8,DIRECT',
+      'IP-CIDR,172.16.0.0/12,DIRECT',
+      'IP-CIDR,192.168.0.0/16,DIRECT',
+      'IP-CIDR,127.0.0.0/8,DIRECT',
+      'GEOSITE,category-ads-all,REJECT',
       'MATCH,PROXY',
     ]
   }
