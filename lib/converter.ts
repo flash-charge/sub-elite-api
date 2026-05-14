@@ -1063,6 +1063,9 @@ function buildProxyGroups(model, proxies) {
       normalizedGroup.url = group.url || 'http://www.gstatic.com/generate_204'
       normalizedGroup.interval = Number(group.interval) || 300
     }
+    if (type === 'load-balance') {
+      normalizedGroup.strategy = group.strategy || 'consistent-hashing'
+    }
     if (!normalizedGroup.use.length) delete normalizedGroup.use
 
     return normalizedGroup
@@ -1767,6 +1770,7 @@ function normalizeGroup(group: ProxyNode = {}) {
     includeAllProxies: normalizeBooleanValue(group.includeAllProxies ?? group['include-all-proxies']),
     includeAllProviders: normalizeBooleanValue(group.includeAllProviders ?? group['include-all-providers']),
     lazy: group.lazy === undefined ? undefined : normalizeBooleanValue(group.lazy),
+    strategy: group.strategy || '',
     timeout: Number(group.timeout) || 0,
     maxFailedTimes: Number(group.maxFailedTimes || group['max-failed-times']) || 0,
     disableUdp: normalizeBooleanValue(group.disableUdp ?? group['disable-udp']),
