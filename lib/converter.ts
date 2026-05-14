@@ -1212,7 +1212,10 @@ function buildProxyGroups(model, proxies) {
   return model.groups.map((group) => {
     const type = groupTypes.includes(group.type) ? group.type : 'select'
     const names = Array.isArray(group.proxies) && group.proxies.length > 0 ? group.proxies : proxyNames
-    const filteredNames = names.filter((name) => name !== (group.name || 'PROXY') && (proxyNames.includes(name) || specialNames.includes(name) || name === 'AUTO'))
+    const usesProviders = group.use.length || group.includeAll || group.includeAllProxies || group.includeAllProviders
+    const filteredNames = usesProviders
+      ? names.filter((name) => name !== (group.name || 'PROXY'))
+      : names.filter((name) => name !== (group.name || 'PROXY') && (proxyNames.includes(name) || specialNames.includes(name) || name === 'AUTO'))
     const normalizedGroup: ProxyNode = {
       name: group.name || 'PROXY',
       type,
