@@ -1113,7 +1113,7 @@ function buildRuleProviders(ruleProviders) {
           format: provider.format || undefined,
           'size-limit': provider.sizeLimit || undefined,
           header: provider.header,
-          payload: provider.payload,
+          payload: provider.type === 'inline' && provider.payload.length ? provider.payload : undefined,
         }),
       ]),
   )
@@ -1146,7 +1146,7 @@ function buildProxyProviders(proxyProviders) {
           filter: provider.filter || undefined,
           'exclude-filter': provider.excludeFilter || undefined,
           'exclude-type': provider.excludeType || undefined,
-          payload: provider.payload,
+          payload: provider.type === 'inline' && provider.payload.length ? provider.payload.map(stripUiProxyFields) : undefined,
         }),
       ]),
   )
@@ -1166,8 +1166,9 @@ function buildTunnels(tunnels) {
 }
 
 function parseSniffList(items) {
+  const lines = Array.isArray(items) ? items.map((item) => String(item).trim()).filter(Boolean) : String(items || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
   return Object.fromEntries(
-    normalizeList(items, []).map((item) => {
+    lines.map((item) => {
       const [protocol, ports = ''] = item.split(':')
       return [protocol, normalizeSniffProtocol({ ports })]
     }).filter(([protocol, config]) => protocol && (config as any).ports?.length),
